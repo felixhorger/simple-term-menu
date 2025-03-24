@@ -1216,7 +1216,14 @@ class TerminalMenu:
                         ) from e
                 else:
                     preview_string = self._preview_command(preview_argument) if preview_argument is not None else ""
+                    if isinstance(preview_string, tuple):
+                        assert len(preview_string) == 2, "simple-term-menu: preview_command function returned a tuple with length unequal two"
+                        assert all(isinstance(s, str) for s in preview_string), "simple-term-menu: preview_command function returned a tuple not containing only strings"
+                        self._preview_title, preview_string = preview_string
+                        self._preview_title = strip_ansi_codes(self._preview_title, exclude_style=True)
+
                 return preview_string
+
 
             @static_variables(
                 # Regex taken from https://stackoverflow.com/a/14693789/5958465
@@ -1224,11 +1231,11 @@ class TerminalMenu:
                 # Modified version of https://stackoverflow.com/a/2188410/5958465
                 ansi_sgr_regex=re.compile(r"\x1B\[[;\d]*m"),
             )
-            def strip_ansi_codes_except_styling(string: str) -> str:
-                stripped_string = strip_ansi_codes_except_styling.ansi_escape_regex.sub(  # type: ignore
+            def strip_ansi_codes(string: str, exclude_style=True) -> str:
+                stripped_string = strip_ansi_codes.ansi_escape_regex.sub(  # type: ignore
                     lambda match_obj: (
                         match_obj.group(0)
-                        if strip_ansi_codes_except_styling.ansi_sgr_regex.match(match_obj.group(0))  # type: ignore
+                        if exclude_style and strip_ansi_codes.ansi_sgr_regex.match(match_obj.group(0))  # type: ignore
                         else ""
                     ),
                     string,
@@ -1276,21 +1283,23 @@ class TerminalMenu:
             try:
                 preview_string = get_preview_string()
                 if preview_string is not None:
-                    preview_string = strip_ansi_codes_except_styling(preview_string)
+                    preview_string = strip_ansi_codes(preview_string)
             except PreviewCommandFailedError as e:
                 preview_string = "The preview command failed with error message:\n\n" + str(e)
             self._tty_out.write(current_menu_height * self._codename_to_terminal_code["cursor_down"])
             if preview_string is not None:
                 self._tty_out.write(self._codename_to_terminal_code["cursor_down"] + "\r")
                 if self._preview_border:
+                    stripped_title = strip_ansi_codes(self._preview_title, exclude_style=False)
+                    offset = len(self._preview_title) - len(stripped_title)
                     self._tty_out.write(
                         (
                             BoxDrawingCharacters.upper_left
-                            + (2 * BoxDrawingCharacters.horizontal + " " + self._preview_title)[: num_cols - 3]
+                            + (2 * BoxDrawingCharacters.horizontal + " " + self._preview_title)[: num_cols - 3 + offset]
                             + " "
-                            + (num_cols - wcswidth(self._preview_title) - 6) * BoxDrawingCharacters.horizontal
+                            + (num_cols - wcswidth(stripped_title) - 6) * BoxDrawingCharacters.horizontal
                             + BoxDrawingCharacters.upper_right
-                        )[:num_cols]
+                        )[:num_cols+offset]
                         + "\n"
                     )
                 # `finditer` can be used as a generator version of `str.join`
