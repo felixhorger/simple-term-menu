@@ -1295,9 +1295,9 @@ class TerminalMenu:
                     self._tty_out.write(
                         (
                             BoxDrawingCharacters.upper_left
-                            + (2 * BoxDrawingCharacters.horizontal + " " + self._preview_title)[: num_cols - 3 + offset]
-                            + " "
                             + (num_cols - wcswidth(stripped_title) - 6) * BoxDrawingCharacters.horizontal
+                            + " "
+                            + (self._preview_title + " " + 2 * BoxDrawingCharacters.horizontal)[: num_cols - 3 + offset]
                             + BoxDrawingCharacters.upper_right
                         )[:num_cols+offset]
                         + "\n"
