@@ -1221,6 +1221,7 @@ class TerminalMenu:
                         assert all(isinstance(s, str) for s in preview_string), "simple-term-menu: preview_command function returned a tuple not containing only strings"
                         self._preview_title, preview_string = preview_string
                         self._preview_title = strip_ansi_codes(self._preview_title, exclude_style=True)
+                    preview_string = preview_string.replace("\t", "        ")
 
                 return preview_string
 
