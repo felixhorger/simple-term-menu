@@ -1054,6 +1054,23 @@ class TerminalMenu:
                 for style in style_iterable:
                     file.write(self._codename_to_terminal_code[style])
 
+        @static_variables(
+            # Regex taken from https://stackoverflow.com/a/14693789/5958465
+            ansi_escape_regex=re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])"),
+            # Modified version of https://stackoverflow.com/a/2188410/5958465
+            ansi_sgr_regex=re.compile(r"\x1B\[[;\d]*m"),
+        )
+        def strip_ansi_codes(string: str, exclude_style=True) -> str:
+            stripped_string = strip_ansi_codes.ansi_escape_regex.sub(  # type: ignore
+                lambda match_obj: (
+                    match_obj.group(0)
+                    if exclude_style and strip_ansi_codes.ansi_sgr_regex.match(match_obj.group(0))  # type: ignore
+                    else ""
+                ),
+                string,
+            )
+            return cast(str, stripped_string)
+
         def print_menu_entries() -> int:
             # pylint: disable=unsubscriptable-object
             assert self._codename_to_terminal_code is not None
@@ -1066,9 +1083,9 @@ class TerminalMenu:
             if self._title_lines:
                 self._tty_out.write(
                     len(self._title_lines) * self._codename_to_terminal_code["cursor_up"]
-                    + "\r"
+                    #+ "\r"
                     + "\n".join(
-                        (title_line[:num_cols] + (num_cols - wcswidth(title_line)) * " ")
+                        (title_line[:num_cols] + (num_cols - wcswidth(strip_ansi_codes(title_line, exclude_style=False))) * " ")
                         for title_line in self._title_lines
                     )
                     + "\n"
