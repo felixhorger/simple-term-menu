@@ -510,12 +510,13 @@ class TerminalMenu:
 
         @preview_lines_count.setter
         def preview_lines_count(self, value: int) -> None:
-            self._preview_lines_count = min(
-                value if value >= 3 else 0,
+            self._preview_lines_count = (
+            #min(
+                #value if value >= 3 else 0,
                 TerminalMenu._num_lines()
                 - self._title_lines_count
                 - self._status_bar_lines_count
-                - MIN_VISIBLE_MENU_ENTRIES_COUNT,
+                - MIN_VISIBLE_MENU_ENTRIES_COUNT#,
             )
 
         @property
