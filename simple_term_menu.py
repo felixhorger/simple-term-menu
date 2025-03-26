@@ -76,6 +76,7 @@ DEFAULT_SHOW_SHORTCUT_HINTS = False
 DEFAULT_SHOW_SHORTCUT_HINTS_IN_STATUS_BAR = True
 DEFAULT_STATUS_BAR_BELOW_PREVIEW = False
 DEFAULT_STATUS_BAR_STYLE = ("fg_yellow", "bg_black")
+DEFAULT_TITLE_STYLE = ("bg_black")
 MIN_VISIBLE_MENU_ENTRIES_COUNT = 3
 
 
@@ -630,7 +631,8 @@ class TerminalMenu:
         status_bar: Optional[Union[str, Iterable[str], Callable[[str], str]]] = None,
         status_bar_below_preview: bool = DEFAULT_STATUS_BAR_BELOW_PREVIEW,
         status_bar_style: Optional[Iterable[str]] = DEFAULT_STATUS_BAR_STYLE,
-        title: Optional[Union[str, Iterable[str]]] = None
+        title: Optional[Union[str, Iterable[str]]] = None,
+        title_style: Optional[Iterable[str]] = DEFAULT_TITLE_STYLE,
     ):
         def check_for_terminal_environment() -> None:
             if "TERM" not in os.environ or os.environ["TERM"] == "":
@@ -788,6 +790,7 @@ class TerminalMenu:
             )
         self._status_bar_below_preview = status_bar_below_preview
         self._status_bar_style = tuple(status_bar_style) if status_bar_style is not None else ()
+        self._title_style = tuple(title_style) if title_style is not None else ()
         self._title_lines = setup_title_or_status_bar_lines(
             title,
             show_shortcut_hints and not show_shortcut_hints_in_status_bar,
@@ -946,6 +949,7 @@ class TerminalMenu:
             self._search_highlight_style,
             self._shortcut_key_highlight_style,
             self._shortcut_brackets_highlight_style,
+            self._title_style,
             self._status_bar_style,
             self._multi_select_cursor_brackets_style,
             self._multi_select_cursor_style,
@@ -1081,15 +1085,17 @@ class TerminalMenu:
             current_menu_block_displayed_height = 0  # sum all written lines
             num_cols = self._num_cols()
             if self._title_lines:
+                apply_style(self._title_style)
                 self._tty_out.write(
-                    len(self._title_lines) * self._codename_to_terminal_code["cursor_up"]
-                    #+ "\r"
+                    (len(self._title_lines)+1) * self._codename_to_terminal_code["cursor_up"]
+                    + "\r"
                     + "\n".join(
-                        (title_line[:num_cols] + (num_cols - wcswidth(strip_ansi_codes(title_line, exclude_style=False))) * " ")
+                        (title_line[:num_cols] + (num_cols - wcswidth(title_line)) * " ")
                         for title_line in self._title_lines
                     )
-                    + "\n"
+                    + 2*"\n"
                 )
+                apply_style()
             shortcut_string_len = 4 if self._shortcuts_defined else 0
             displayed_index = -1
             for displayed_index, menu_index, menu_entry in self._view:
