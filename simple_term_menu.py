@@ -76,7 +76,8 @@ DEFAULT_SHOW_SHORTCUT_HINTS = False
 DEFAULT_SHOW_SHORTCUT_HINTS_IN_STATUS_BAR = True
 DEFAULT_STATUS_BAR_BELOW_PREVIEW = False
 DEFAULT_STATUS_BAR_STYLE = ("fg_yellow", "bg_black")
-DEFAULT_TITLE_STYLE = ("bg_black")
+DEFAULT_TITLE_STYLE = ("bg_black",)
+DEFAULT_PREVIEW_TITLE_STYLE = ("bg_black",)
 MIN_VISIBLE_MENU_ENTRIES_COUNT = 3
 
 
@@ -615,6 +616,7 @@ class TerminalMenu:
         preview_command: Optional[Union[str, Callable[[str], str]]] = None,
         preview_size: float = DEFAULT_PREVIEW_SIZE,
         preview_title: str = DEFAULT_PREVIEW_TITLE,
+        preview_title_style: Optional[Iterable[str]] = DEFAULT_PREVIEW_TITLE_STYLE,
         quit_keys: Iterable[str] = DEFAULT_QUIT_KEYS,
         raise_error_on_interrupt: bool = False,
         search_case_sensitive: bool = DEFAULT_SEARCH_CASE_SENSITIVE,
@@ -762,6 +764,7 @@ class TerminalMenu:
         self._preview_command = preview_command
         self._preview_size = preview_size
         self._preview_title = preview_title
+        self._preview_title_style = tuple(preview_title_style) if preview_title_style is not None else ()
         self._quit_keys = tuple(quit_keys)
         self._raise_error_on_interrupt = raise_error_on_interrupt
         self._search_case_sensitive = search_case_sensitive
@@ -950,6 +953,7 @@ class TerminalMenu:
             self._search_highlight_style,
             self._shortcut_key_highlight_style,
             self._shortcut_brackets_highlight_style,
+            self._preview_title_style,
             self._title_style,
             self._status_bar_style,
             self._multi_select_cursor_brackets_style,
@@ -1058,23 +1062,6 @@ class TerminalMenu:
             if style_iterable is not None:
                 for style in style_iterable:
                     file.write(self._codename_to_terminal_code[style])
-
-        @static_variables(
-            # Regex taken from https://stackoverflow.com/a/14693789/5958465
-            ansi_escape_regex=re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])"),
-            # Modified version of https://stackoverflow.com/a/2188410/5958465
-            ansi_sgr_regex=re.compile(r"\x1B\[[;\d]*m"),
-        )
-        def strip_ansi_codes(string: str, exclude_style=True) -> str:
-            stripped_string = strip_ansi_codes.ansi_escape_regex.sub(  # type: ignore
-                lambda match_obj: (
-                    match_obj.group(0)
-                    if exclude_style and strip_ansi_codes.ansi_sgr_regex.match(match_obj.group(0))  # type: ignore
-                    else ""
-                ),
-                string,
-            )
-            return cast(str, stripped_string)
 
         def print_menu_entries() -> int:
             # pylint: disable=unsubscriptable-object
@@ -1244,7 +1231,7 @@ class TerminalMenu:
                         assert len(preview_string) == 2, "simple-term-menu: preview_command function returned a tuple with length unequal two"
                         assert all(isinstance(s, str) for s in preview_string), "simple-term-menu: preview_command function returned a tuple not containing only strings"
                         self._preview_title, preview_string = preview_string
-                        self._preview_title = strip_ansi_codes(self._preview_title, exclude_style=True)
+                        self._preview_title = strip_ansi_codes(self._preview_title, exclude_style=False)
                     preview_string = preview_string.replace("\t", "        ")
 
                 return preview_string
@@ -1315,16 +1302,26 @@ class TerminalMenu:
             if preview_string is not None:
                 self._tty_out.write(self._codename_to_terminal_code["cursor_down"] + "\r")
                 if self._preview_border:
-                    stripped_title = strip_ansi_codes(self._preview_title, exclude_style=False)
-                    offset = len(self._preview_title) - len(stripped_title)
+                    num_left = num_cols - wcswidth(self._preview_title) - 6 # corner, 2x horizontal, space, and this left and right, makes 6 chars
+                    if num_left < 0:
+                        self._preview_title = self._preview_title[:num_left]
+                        num_left = 0
+                    #num_right = num_cols - 3 - len(self._preview_title) - num_left - 2
                     self._tty_out.write(
                         (
                             BoxDrawingCharacters.upper_left
-                            + (num_cols - wcswidth(stripped_title) - 6) * BoxDrawingCharacters.horizontal
+                            + num_left * BoxDrawingCharacters.horizontal
                             + " "
-                            + (self._preview_title + " " + 2 * BoxDrawingCharacters.horizontal)[: num_cols - 3 + offset]
+                        )
+                    )
+                    apply_style(self._preview_title_style)
+                    self._tty_out.write(self._preview_title)
+                    apply_style()
+                    self._tty_out.write(
+                        (
+                            (" " + 2 * BoxDrawingCharacters.horizontal)
                             + BoxDrawingCharacters.upper_right
-                        )[:num_cols+offset]
+                        )
                         + "\n"
                     )
                 # `finditer` can be used as a generator version of `str.join`
